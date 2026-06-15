@@ -37,7 +37,8 @@ class User < ApplicationRecord
   end
 
   def self.roadmap_tasks_for(track)
-    if track == "SWE"
+    case track
+    when "SWE"
       [
         { month: 1, week_label: "Wk 1–2", text: "Arrays & Hashing - two pointers, sliding window, prefix sums" },
         { month: 1, week_label: "Wk 1–2", text: "Stacks & Queues - monotonic stack, queue with stacks" },
@@ -56,7 +57,7 @@ class User < ApplicationRecord
         { month: 6, week_label: "Wk 1–2", text: "Company Prep - signature designs, LP stories for Amazon/FAANG" },
         { month: 6, week_label: "Wk 3–4", text: "Behavioral - 8-10 stories in STAR format, 'Why?' drill 3 levels deep" }
       ]
-    elsif track == "AI"
+    when "AI"
       [
         { month: 1, week_label: "Wk 1–2", text: "Async I/O Engineering - concurrent batching and streaming limits" },
         { month: 1, week_label: "Wk 1–2", text: "Strict Schema Decoding - JSON Schema / Pydantic at gateway edge" },
@@ -70,6 +71,21 @@ class User < ApplicationRecord
         { month: 3, week_label: "Wk 1–2", text: "Telemetry - OpenTelemetry tracing, span latencies, token consumption" },
         { month: 3, week_label: "Wk 3–4", text: "AI System Design - scale limits, runtime quantization (FP32 -> INT8)" },
         { month: 3, week_label: "Wk 3–4", text: "Mock Loops - live interview screens, trade-off comparisons" }
+      ]
+    when "BYTEBYTEGO"
+      [
+        { month: 1, week_label: "Wk 1–2", text: "Scale Estimation - QPS, storage size, and network bandwidth limits" },
+        { month: 1, week_label: "Wk 3–4", text: "Core Distributed Blocks - consistent hashing, CDN, DNS, and load balancers" },
+        { month: 2, week_label: "Wk 1–2", text: "Storage Systems - key-value stores, sharding, and replication topologies" },
+        { month: 2, week_label: "Wk 3–4", text: "Caching Strategies - eviction policies, invalidation, and write patterns" },
+        { month: 3, week_label: "Wk 1–2", text: "Messaging - message queues vs event streams (Kafka vs RabbitMQ)" },
+        { month: 3, week_label: "Wk 3–4", text: "Rate Limiting - Token Bucket, Leaking Bucket, and Sliding Window Log" },
+        { month: 4, week_label: "Wk 1–2", text: "Scale Case Study - Netflix CDN streaming and YouTube transcoding" },
+        { month: 4, week_label: "Wk 3–4", text: "Geospatial & Chat - Uber geospatial indexing and Discord chat architectures" },
+        { month: 5, week_label: "Wk 1–2", text: "ML Systems - Recommendation engines and visual search pipelines" },
+        { month: 5, week_label: "Wk 3–4", text: "GenAI Infrastructure - LLM orchestration, vector search (RAG), and quantization" },
+        { month: 6, week_label: "Wk 1–2", text: "OOD Patterns - Design Parking Lot, Movie Booking, and Elevator" },
+        { month: 6, week_label: "Wk 3–4", text: "Active Architecture Review - reverse-engineering system design trade-offs" }
       ]
     else # HYBRID
       [

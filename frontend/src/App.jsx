@@ -1201,7 +1201,7 @@ export default function App() {
                 <p style={{ color: "var(--text-secondary)" }}>Review targets week-by-week and check off your completed milestones.</p>
               </div>
               <div style={{ display: "flex", gap: 10 }}>
-                {["SWE", "AI", "HYBRID"].map(t => (
+                {["SWE", "AI", "BYTEBYTEGO", "HYBRID"].map(t => (
                   <button
                     key={t}
                     onClick={async () => {
@@ -1217,7 +1217,7 @@ export default function App() {
                       borderColor: profile.current_track === t ? "var(--color-indigo)" : ""
                     }}
                   >
-                    {t} Track
+                    {t === "BYTEBYTEGO" ? "ByteByteGo" : t} Track
                   </button>
                 ))}
               </div>
@@ -1234,6 +1234,8 @@ export default function App() {
                   ? ["Month 1: Foundation & Assessment", "Month 2: DSA Patterns & Advanced Structures", "Month 3: System Design & LLD", "Month 4: Deep System Design & Concurrency", "Month 5: Integration & Mock Interviews", "Month 6: Company Specifics & Behavioral"][month - 1]
                   : profile.current_track === "AI"
                   ? ["Phase 1: Context Mechanics & Probabilistic Infrastructure", "Phase 2: Standardizing Tool Integration via MCP", "Phase 3: Automated Evals, Observability & Design"][month - 1]
+                  : profile.current_track === "BYTEBYTEGO"
+                  ? ["Month 1: Scale Estimation & Core Blocks", "Month 2: Storage Systems & Caching", "Month 3: Messaging & Rate Limiting", "Month 4: Case Studies (Netflix/Uber/Discord)", "Month 5: ML & GenAI Infrastructure", "Month 6: OOD Patterns & Capstone Reviews"][month - 1]
                   : `Month ${month} Milestone Track`;
 
                 const monthColor = ["#6366f1", "#8b5cf6", "#0ea5e9", "#14b8a6", "#f59e0b", "#ef4444"][month - 1] || "#6366f1";

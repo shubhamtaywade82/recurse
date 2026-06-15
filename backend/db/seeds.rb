@@ -132,6 +132,11 @@ content_chunks_data = [
     source_type: "ai",
     title: "Structured Outputs: Enforcing JSON Schemas",
     content: "To build deterministic integration layers, production applications use Structured Outputs. Rather than relying on fuzzy prompt parsing, the model output is constrained at the sampler level by a defined JSON Schema.\nSetting strict: true ensures that responses comply 100% with the specified format. The temperature parameter should be forced to 0.0 to prevent random deviations or schema validation failures."
+  },
+  {
+    source_type: "system_design",
+    title: "ByteByteGo: Advanced System Design Reference",
+    content: "ByteByteGo, created by Alex Xu, is a dynamic system design learning ecosystem that skips baseline fundamentals to focus on deep-dive infrastructure case studies. It covers: \n1. High-scale architectures (Netflix video streaming, Uber geospatial coordination, Discord real-time messaging).\n2. Specializations in Machine Learning/AI infra (recommendations, visual search pipelines, vector search RAG systems) and Object-Oriented Design (OOD).\n3. Core building blocks (sharding, consistent hashing, rate limiting options, CDNs).\nKey takeaway: When using ByteByteGo, engineers should avoid passive reading and actively reverse-engineer component topologies before checking the proposed solutions."
   }
 ]
 
