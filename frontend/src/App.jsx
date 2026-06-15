@@ -22,7 +22,8 @@ import {
   Zap,
   Share2,
   Trash2,
-  Plus
+  Plus,
+  Star
 } from "lucide-react";
 
 export default function App() {
