@@ -1,2 +1,2 @@
-web: cd backend && bundle exec rails server -p 3005 -b 0.0.0.0
+web: cd backend && PORT=3005 bundle exec rails server -b 0.0.0.0
 frontend: cd frontend && npm run dev -- --host 0.0.0.0

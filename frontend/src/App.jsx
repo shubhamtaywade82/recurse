@@ -395,7 +395,7 @@ export default function App() {
   const sendCoachMessage = async (e) => {
     e.preventDefault();
     if (!chatInput.trim() || !activeSession) return;
-    
+
     const userMsg = chatInput;
     setChatInput("");
     setSessionMessages(m => [...m, { sender: "user", content: userMsg }]);
@@ -883,7 +883,7 @@ export default function App() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Shubham Taywade"
+                  placeholder="e.g. John Doe"
                   value={authForm.name}
                   onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })}
                   className="input-field"
@@ -1229,7 +1229,7 @@ export default function App() {
                 acc[item.month].push(item);
                 return acc;
               }, {})).map(([month, items]) => {
-                const monthTitle = profile.current_track === "SWE" 
+                const monthTitle = profile.current_track === "SWE"
                   ? ["Month 1: Foundation & Assessment", "Month 2: DSA Patterns & Advanced Structures", "Month 3: System Design & LLD", "Month 4: Deep System Design & Concurrency", "Month 5: Integration & Mock Interviews", "Month 6: Company Specifics & Behavioral"][month - 1]
                   : profile.current_track === "AI"
                   ? ["Phase 1: Context Mechanics & Probabilistic Infrastructure", "Phase 2: Standardizing Tool Integration via MCP", "Phase 3: Automated Evals, Observability & Design"][month - 1]
@@ -1473,7 +1473,7 @@ export default function App() {
                         <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 6 }}>
                           Rubric feedback and overall score of <strong>{activeInterview.score}%</strong> has been recorded.
                         </p>
-                        
+
                         {/* SHARE BUTTON */}
                         <div style={{ marginTop: 15, display: "flex", gap: 10, justifyContent: "center" }}>
                           <button
@@ -1557,14 +1557,14 @@ export default function App() {
                           </span>
                         </div>
                       </div>
-                      
+
                       {i.eval_result && (
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,0,0,0.2)", padding: "8px 12px", borderRadius: 4, fontSize: 11 }}>
                           <div style={{ display: "flex", gap: 10 }}>
                             <span style={{ color: "var(--text-secondary)" }}>Groundedness: <strong>{i.eval_result.groundedness}</strong></span>
                             <span style={{ color: "var(--text-secondary)" }}>Relevance: <strong>{i.eval_result.relevance}</strong></span>
                           </div>
-                          
+
                           {/* PUBLIC SHARE ACTIONS */}
                           <button
                             onClick={() => {
@@ -1901,7 +1901,7 @@ export default function App() {
                           <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Week {w.week}</span>
                         </div>
                         <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>{w.details}</p>
-                        
+
                         <div style={{ display: "flex", gap: 10, marginTop: 5 }}>
                           {Object.entries(w.hours).map(([cat, val]) => (
                             <span key={cat} style={{ fontSize: 10, color: "var(--text-muted)" }}>
