@@ -20,14 +20,25 @@ import {
   User,
   Sparkles,
   Zap,
-  Star
+  Share2,
+  Trash2,
+  Plus
 } from "lucide-react";
 
 export default function App() {
+  const [token, setToken] = useState(localStorage.getItem("token") || "");
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem("user") || "null") || { name: "", email: "", plan: "free", admin: false });
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [user, setUser] = useState({ name: "Loading...", email: "", plan: "free" });
   const [profile, setProfile] = useState({ years_experience: 5, target_companies: [], current_track: "SWE" });
-  
+
+  // Shared view state
+  const [sharedToken, setSharedToken] = useState("");
+  const [sharedData, setSharedData] = useState(null);
+
+  // Auth screen state
+  const [authTab, setAuthTab] = useState("login");
+  const [authForm, setAuthForm] = useState({ email: "", password: "", name: "" });
+
   // Loading & Notification states
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState(null);
@@ -70,23 +81,38 @@ export default function App() {
   const [customPlan, setCustomPlan] = useState(null);
   const [planForm, setPlanForm] = useState({ track: "SWE", experience: 5, companies: "Google, Meta", hours: 20 });
 
-  // Set up notifications
-  const showNotification = (message, type = "success") => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 4000);
-  };
+  // ADMIN STATE
+  const [adminTab, setAdminTab] = useState("metrics");
+  const [systemMetrics, setSystemMetrics] = useState({ total_users: 0, pro_users: 0, team_users: 0, total_study_hours: 0, total_interviews: 0, average_interview_score: 0 });
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [adminProblems, setAdminProblems] = useState([]);
+  const [adminChunks, setAdminChunks] = useState([]);
+  const [adminProblemForm, setAdminProblemForm] = useState({ slug: "", title: "", difficulty: "Medium", topic: "Arrays & Hashing", source: "Custom", platform: "PrepEdge", description: "", starter_code: "" });
+  const [adminChunkForm, setAdminChunkForm] = useState({ source_type: "system_design", title: "", content: "" });
 
-  // Fetch initial profile data
+  // Check URL for public share token
   useEffect(() => {
-    fetchProfile();
-    fetchStudyLogs();
-    fetchChecklist();
-    fetchCoachSessions();
-    fetchMockInterviews();
-    fetchProblems();
-    fetchGapAnalytics();
-    fetchPracticePlan();
+    const params = new URLSearchParams(window.location.search);
+    const shared = params.get("shared");
+    if (shared) {
+      setSharedToken(shared);
+      fetchSharedInterview(shared);
+    }
   }, []);
+
+  // Fetch data if user authenticated
+  useEffect(() => {
+    if (token && !sharedToken) {
+      fetchProfile();
+      fetchStudyLogs();
+      fetchChecklist();
+      fetchCoachSessions();
+      fetchMockInterviews();
+      fetchProblems();
+      fetchGapAnalytics();
+      fetchPracticePlan();
+    }
+  }, [token, sharedToken]);
 
   useEffect(() => {
     if (chatEndRef.current) {
@@ -94,7 +120,6 @@ export default function App() {
     }
   }, [sessionMessages]);
 
-  // Timer for DSA problem solving
   useEffect(() => {
     if (selectedProblem) {
       setProblemTimer(0);
@@ -107,40 +132,114 @@ export default function App() {
     return () => clearInterval(timerRef.current);
   }, [selectedProblem]);
 
+  // Authenticated fetch helper
+  const fetchAuth = async (url, options = {}) => {
+    const headers = {
+      ...options.headers,
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json"
+    };
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401) {
+      // Clear expired auth session
+      handleLogout();
+      throw new Error("Session expired. Please log in again.");
+    }
+    return res;
+  };
+
+  const showNotification = (message, type = "success") => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  // Auth Operations
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    const endpoint = authTab === "login" ? "/api/v1/auth/login" : "/api/v1/auth/register";
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(authForm)
+      });
+      const data = await res.json();
+      if (data.token) {
+        setToken(data.token);
+        setUser(data.user);
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        showNotification(`Welcome back, ${data.user.name}!`);
+        setAuthForm({ email: "", password: "", name: "" });
+      } else {
+        showNotification(data.error || "Authentication failed", "error");
+      }
+    } catch (err) {
+      showNotification("Network error occurred", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setToken("");
+    setUser({ name: "", email: "", plan: "free", admin: false });
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    showNotification("Logged out successfully");
+  };
+
+  // Shared interview retrieval
+  const fetchSharedInterview = async (shareToken) => {
+    try {
+      const res = await fetch(`/api/v1/shared/mock_interviews/${shareToken}`);
+      const data = await res.json();
+      if (data.mock_interview) {
+        setSharedData(data);
+      } else {
+        showNotification(data.error || "Failed to load shared report", "error");
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Standard Profile / API Queries
   const fetchProfile = async () => {
     try {
-      const res = await fetch("/api/v1/profile");
+      const res = await fetchAuth("/api/v1/profile");
       const data = await res.json();
       if (data.profile) setProfile(data.profile);
       if (data.user) setUser(data.user);
     } catch (e) {
-      console.error("Failed to fetch profile", e);
+      console.error(e);
     }
   };
 
   const fetchStudyLogs = async () => {
     try {
-      const res = await fetch("/api/v1/study_logs");
+      const res = await fetchAuth("/api/v1/study_logs");
       const data = await res.json();
       if (data.study_logs) setStudyLogs(data.study_logs);
     } catch (e) {
-      console.error("Failed to fetch study logs", e);
+      console.error(e);
     }
   };
 
   const fetchChecklist = async () => {
     try {
-      const res = await fetch("/api/v1/checklist_items");
+      const res = await fetchAuth("/api/v1/checklist_items");
       const data = await res.json();
       if (data.checklist_items) setChecklistItems(data.checklist_items);
     } catch (e) {
-      console.error("Failed to fetch checklist", e);
+      console.error(e);
     }
   };
 
   const fetchCoachSessions = async () => {
     try {
-      const res = await fetch("/api/v1/coach_sessions");
+      const res = await fetchAuth("/api/v1/coach_sessions");
       const data = await res.json();
       if (data.coach_sessions) {
         setCoachSessions(data.coach_sessions);
@@ -149,47 +248,47 @@ export default function App() {
         }
       }
     } catch (e) {
-      console.error("Failed to fetch coach sessions", e);
+      console.error(e);
     }
   };
 
   const fetchMockInterviews = async () => {
     try {
-      const res = await fetch("/api/v1/mock_interviews");
+      const res = await fetchAuth("/api/v1/mock_interviews");
       const data = await res.json();
       if (data.mock_interviews) setMockInterviews(data.mock_interviews);
     } catch (e) {
-      console.error("Failed to fetch mock interviews", e);
+      console.error(e);
     }
   };
 
   const fetchProblems = async () => {
     try {
-      const res = await fetch("/api/v1/problems");
+      const res = await fetchAuth("/api/v1/problems");
       const data = await res.json();
       if (data.problems) setProblems(data.problems);
     } catch (e) {
-      console.error("Failed to fetch problems", e);
+      console.error(e);
     }
   };
 
   const fetchGapAnalytics = async () => {
     try {
-      const res = await fetch("/api/v1/gap_analytics");
+      const res = await fetchAuth("/api/v1/gap_analytics");
       const data = await res.json();
       if (data) setGapData(data);
     } catch (e) {
-      console.error("Failed to fetch gap analytics", e);
+      console.error(e);
     }
   };
 
   const fetchPracticePlan = async () => {
     try {
-      const res = await fetch("/api/v1/practice_plan");
+      const res = await fetchAuth("/api/v1/practice_plan");
       const data = await res.json();
       if (data.plan) setCustomPlan(data.plan);
     } catch (e) {
-      console.error("Failed to fetch practice plan", e);
+      console.error(e);
     }
   };
 
@@ -197,14 +296,14 @@ export default function App() {
   const handleUpgrade = async (plan) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/v1/subscriptions/upgrade", {
+      const res = await fetchAuth("/api/v1/subscriptions/upgrade", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan })
       });
       const data = await res.json();
       if (data.user) {
         setUser(data.user);
+        localStorage.setItem("user", JSON.stringify(data.user));
         showNotification(`Simulated payment approved! Upgraded to ${plan} tier.`);
       }
     } catch (e) {
@@ -219,9 +318,8 @@ export default function App() {
     setLoading(true);
     const today = new Date().toISOString().split("T")[0];
     try {
-      const res = await fetch("/api/v1/study_logs", {
+      const res = await fetchAuth("/api/v1/study_logs", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date: today,
           dsa_minutes: logForm.dsa,
@@ -246,7 +344,7 @@ export default function App() {
 
   const toggleChecklist = async (id) => {
     try {
-      const res = await fetch(`/api/v1/checklist_items/${id}/toggle`, {
+      const res = await fetchAuth(`/api/v1/checklist_items/${id}/toggle`, {
         method: "POST"
       });
       const data = await res.json();
@@ -263,7 +361,7 @@ export default function App() {
 
   const selectCoachSession = async (id) => {
     try {
-      const res = await fetch(`/api/v1/coach_sessions/${id}`);
+      const res = await fetchAuth(`/api/v1/coach_sessions/${id}`);
       const data = await res.json();
       if (data.coach_session) {
         setActiveSession(data.coach_session);
@@ -277,9 +375,8 @@ export default function App() {
   const createCoachSession = async (type = "general") => {
     setLoading(true);
     try {
-      const res = await fetch("/api/v1/coach_sessions", {
+      const res = await fetchAuth("/api/v1/coach_sessions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_type: type })
       });
       const data = await res.json();
@@ -302,14 +399,11 @@ export default function App() {
     const userMsg = chatInput;
     setChatInput("");
     setSessionMessages(m => [...m, { sender: "user", content: userMsg }]);
-    
-    // Add fake typing state
     setSessionMessages(m => [...m, { sender: "ai", content: "Thinking..." }]);
 
     try {
-      const res = await fetch(`/api/v1/coach_sessions/${activeSession.id}/messages`, {
+      const res = await fetchAuth(`/api/v1/coach_sessions/${activeSession.id}/messages`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: userMsg })
       });
       const data = await res.json();
@@ -321,7 +415,6 @@ export default function App() {
     } catch (e) {
       console.error(e);
       setSessionMessages(m => m.filter(msg => msg.content !== "Thinking..."));
-      showNotification("Failed to send message", "error");
     }
   };
 
@@ -333,9 +426,8 @@ export default function App() {
     }
     setLoading(true);
     try {
-      const res = await fetch("/api/v1/mock_interviews", {
+      const res = await fetchAuth("/api/v1/mock_interviews", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ interview_type: interviewType })
       });
       const data = await res.json();
@@ -360,9 +452,8 @@ export default function App() {
     setAnswerInput("");
 
     try {
-      const res = await fetch(`/api/v1/mock_interviews/${activeInterview.id}`, {
+      const res = await fetchAuth(`/api/v1/mock_interviews/${activeInterview.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answer: ans })
       });
       const data = await res.json();
@@ -385,7 +476,7 @@ export default function App() {
 
   const selectProblem = async (slug) => {
     try {
-      const res = await fetch(`/api/v1/problems/${slug}`);
+      const res = await fetchAuth(`/api/v1/problems/${slug}`);
       const data = await res.json();
       if (data.problem) {
         setSelectedProblem(data.problem);
@@ -401,9 +492,8 @@ export default function App() {
   const requestSocraticHint = async (level) => {
     if (!selectedProblem) return;
     try {
-      const res = await fetch(`/api/v1/problems/${selectedProblem.id}/user_problems/1/hint_requests`, {
+      const res = await fetchAuth(`/api/v1/problems/${selectedProblem.id}/user_problems/1/hint_requests`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hint_level: level })
       });
       const data = await res.json();
@@ -420,9 +510,8 @@ export default function App() {
     if (!selectedProblem) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/v1/problems/${selectedProblem.id}/user_problems/1/submit_code`, {
+      const res = await fetchAuth(`/api/v1/problems/${selectedProblem.id}/user_problems/1/submit_code`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code: codeEditor,
           notes: notesEditor,
@@ -446,7 +535,7 @@ export default function App() {
   const triggerGapAnalysis = async () => {
     setAnalyzing(true);
     try {
-      await fetch("/api/v1/gap_analytics/trigger", { method: "POST" });
+      await fetchAuth("/api/v1/gap_analytics/trigger", { method: "POST" });
       await fetchGapAnalytics();
       showNotification("Observability metrics synced. Gap analytics updated.");
     } catch (e) {
@@ -460,9 +549,8 @@ export default function App() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch("/api/v1/practice_plan/generate", {
+      const res = await fetchAuth("/api/v1/practice_plan/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           track: planForm.track,
           years_experience: planForm.experience,
@@ -484,6 +572,140 @@ export default function App() {
     }
   };
 
+  // ADMIN OPERATIONS
+  useEffect(() => {
+    if (activeTab === "admin" && user.admin) {
+      fetchAdminMetrics();
+      fetchAdminUsers();
+      fetchAdminProblems();
+      fetchAdminChunks();
+    }
+  }, [activeTab]);
+
+  const fetchAdminMetrics = async () => {
+    const res = await fetchAuth("/api/v1/admin/users/system_metrics");
+    const data = await res.json();
+    setSystemMetrics(data);
+  };
+
+  const fetchAdminUsers = async () => {
+    const res = await fetchAuth("/api/v1/admin/users");
+    const data = await res.json();
+    if (data.users) setAdminUsers(data.users);
+  };
+
+  const fetchAdminProblems = async () => {
+    const res = await fetchAuth("/api/v1/admin/problems");
+    const data = await res.json();
+    if (data.problems) setAdminProblems(data.problems);
+  };
+
+  const fetchAdminChunks = async () => {
+    const res = await fetchAuth("/api/v1/admin/content_chunks");
+    const data = await res.json();
+    if (data.content_chunks) setAdminChunks(data.content_chunks);
+  };
+
+  const updateAdminUserPlan = async (userId, plan) => {
+    try {
+      const res = await fetchAuth(`/api/v1/admin/users/${userId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ user: { plan } })
+      });
+      if (res.ok) {
+        showNotification("User subscription updated successfully.");
+        fetchAdminUsers();
+        fetchAdminMetrics();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteAdminUser = async (userId) => {
+    if (!confirm("Are you sure you want to delete this user?")) return;
+    try {
+      const res = await fetchAuth(`/api/v1/admin/users/${userId}`, { method: "DELETE" });
+      if (res.ok) {
+        showNotification("User account deleted successfully.");
+        fetchAdminUsers();
+        fetchAdminMetrics();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const createAdminProblem = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetchAuth("/api/v1/admin/problems", {
+        method: "POST",
+        body: JSON.stringify({ problem: adminProblemForm })
+      });
+      if (res.ok) {
+        showNotification("DSA practice problem added successfully.");
+        fetchAdminProblems();
+        setAdminProblemForm({ slug: "", title: "", difficulty: "Medium", topic: "Arrays & Hashing", source: "Custom", platform: "PrepEdge", description: "", starter_code: "" });
+      } else {
+        const data = await res.json();
+        showNotification(data.errors.join(", "), "error");
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteAdminProblem = async (id) => {
+    if (!confirm("Delete this problem?")) return;
+    try {
+      const res = await fetchAuth(`/api/v1/admin/problems/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        showNotification("Problem deleted successfully.");
+        fetchAdminProblems();
+        fetchProblems();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const createAdminChunk = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetchAuth("/api/v1/admin/content_chunks", {
+        method: "POST",
+        body: JSON.stringify({ content_chunk: adminChunkForm })
+      });
+      if (res.ok) {
+        showNotification("RAG Document context chunk created.");
+        fetchAdminChunks();
+        setAdminChunkForm({ source_type: "system_design", title: "", content: "" });
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteAdminChunk = async (id) => {
+    if (!confirm("Delete this document chunk?")) return;
+    try {
+      const res = await fetchAuth(`/api/v1/admin/content_chunks/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        showNotification("Document chunk deleted.");
+        fetchAdminChunks();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Helper getters
   const getProgressPercentage = () => {
     if (checklistItems.length === 0) return 0;
@@ -494,6 +716,217 @@ export default function App() {
   const getLogSummaryMinutes = () => {
     return studyLogs.reduce((acc, log) => acc + log.dsa_minutes + log.sd_minutes + log.lld_minutes + log.ai_minutes, 0);
   };
+
+  // ========================================================
+  // RENDER VIEW: PUBLIC SHARED INTERVIEW
+  // ========================================================
+  if (sharedToken) {
+    return (
+      <div style={{ minHeight: "100vh", background: "var(--bg-primary)", padding: "60px 20px", fontFamily: "var(--font-sans)" }}>
+        <div style={{ maxWidth: 760, margin: "0 auto" }}>
+          {sharedData ? (
+            <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div style={{ borderBottom: "1px solid var(--border-glass)", paddingBottom: 15 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--color-indigo)" }}>
+                  <Sparkles size={20} />
+                  <span style={{ fontWeight: 800, fontSize: 18 }}>PrepEdge Shared Report</span>
+                </div>
+                <h2 style={{ fontSize: 24, marginTop: 10 }}>
+                  Shared {sharedData.mock_interview.interview_type.toUpperCase()} Mock Interview
+                </h2>
+                <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4 }}>
+                  Conducted on {new Date(sharedData.mock_interview.created_at).toLocaleDateString()}
+                </p>
+              </div>
+
+              {/* Score Display */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 15 }}>
+                <div style={{ background: "rgba(0,0,0,0.2)", padding: 15, borderRadius: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>Overall Score</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: "var(--color-amber)", marginTop: 4 }}>
+                    {sharedData.mock_interview.score}%
+                  </div>
+                </div>
+                <div style={{ background: "rgba(0,0,0,0.2)", padding: 15, borderRadius: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>Groundedness</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: "var(--color-emerald)", marginTop: 4 }}>
+                    {sharedData.eval_result?.groundedness || "N/A"}
+                  </div>
+                </div>
+                <div style={{ background: "rgba(0,0,0,0.2)", padding: 15, borderRadius: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>Context Relevance</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: "var(--color-sky)", marginTop: 4 }}>
+                    {sharedData.eval_result?.relevance || "N/A"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Rubric Breakdown */}
+              {sharedData.eval_result?.rubric_scores && (
+                <div>
+                  <h3 style={{ fontSize: 16, marginBottom: 12 }}>Rubric Dimension Scores</h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {Object.entries(sharedData.eval_result.rubric_scores).map(([rubric, val]) => (
+                      <div key={rubric}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                          <span style={{ textTransform: "capitalize" }}>{rubric.replace(/_/g, " ")}</span>
+                          <span style={{ fontWeight: 700 }}>{val}/10</span>
+                        </div>
+                        <div style={{ background: "rgba(255,255,255,0.03)", height: 6, borderRadius: 3, overflow: "hidden" }}>
+                          <div style={{ width: `${val * 10}%`, height: "100%", background: "var(--color-indigo)" }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Strengths & Weaknesses */}
+              {sharedData.mock_interview.feedback && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                  <div style={{ background: "rgba(16,185,129,0.02)", border: "1px solid rgba(16,185,129,0.1)", padding: 15, borderRadius: 8 }}>
+                    <h4 style={{ color: "var(--color-emerald)", fontSize: 14, marginBottom: 8 }}>Key Strengths</h4>
+                    <ul style={{ fontSize: 13, color: "var(--text-secondary)", paddingLeft: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+                      {sharedData.mock_interview.feedback.strengths?.map((s, idx) => <li key={idx}>{s}</li>)}
+                    </ul>
+                  </div>
+                  <div style={{ background: "rgba(239,68,68,0.02)", border: "1px solid rgba(239,68,68,0.1)", padding: 15, borderRadius: 8 }}>
+                    <h4 style={{ color: "var(--color-rose)", fontSize: 14, marginBottom: 8 }}>Weaknesses / Improvements</h4>
+                    <ul style={{ fontSize: 13, color: "var(--text-secondary)", paddingLeft: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+                      {sharedData.mock_interview.feedback.weaknesses?.map((w, idx) => <li key={idx}>{w}</li>)}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* Transcript */}
+              <div>
+                <h3 style={{ fontSize: 16, marginBottom: 12 }}>Interview Transcript</h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, background: "#090911", padding: 16, borderRadius: 8, height: 260, overflowY: "auto" }}>
+                  {sharedData.mock_interview.transcript?.map((turn, index) => (
+                    <div key={index} style={{ fontSize: 13 }}>
+                      <strong style={{ color: turn.role === "interviewer" ? "var(--color-indigo)" : "var(--color-emerald)" }}>
+                        {turn.role === "interviewer" ? "Interviewer: " : "You: "}
+                      </strong>
+                      <span style={{ color: "white" }}>{turn.content}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  window.location.search = "";
+                }}
+                className="btn-primary"
+                style={{ alignSelf: "center", marginTop: 10 }}
+              >
+                Go to PrepEdge Platform
+              </button>
+            </div>
+          ) : (
+            <div className="glass-card" style={{ textAlign: "center", padding: 40 }}>
+              <RefreshCw className="glow-text" size={32} style={{ animation: "pulseGlow 1.5s infinite", margin: "0 auto" }} />
+              <p style={{ marginTop: 15 }}>Loading shared interview analysis report...</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ========================================================
+  // RENDER VIEW: AUTHENTICATION GATE SCREEN
+  // ========================================================
+  if (!token) {
+    return (
+      <div style={{
+        minHeight: "100vh", background: "var(--bg-primary)", display: "flex", alignItems: "center",
+        justifyContent: "center", padding: 20, fontFamily: "var(--font-sans)"
+      }}>
+        <div className="glass-card" style={{ width: "100%", maxWidth: 420, padding: 30, display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "var(--color-indigo)" }}>
+              <Sparkles size={28} className="glow-text" />
+              <h1 style={{ fontSize: 26, fontWeight: 800 }}>PrepEdge</h1>
+            </div>
+            <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4 }}>
+              Senior Software Engineer Interview Platform
+            </p>
+          </div>
+
+          <div style={{ display: "flex", borderBottom: "1px solid var(--border-glass)" }}>
+            <button
+              onClick={() => setAuthTab("login")}
+              style={{
+                flex: 1, padding: "10px 0", background: "none", border: "none", color: authTab === "login" ? "white" : "var(--text-muted)",
+                fontWeight: 700, borderBottom: authTab === "login" ? "2px solid var(--color-indigo)" : "none", cursor: "pointer"
+              }}
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => setAuthTab("register")}
+              style={{
+                flex: 1, padding: "10px 0", background: "none", border: "none", color: authTab === "register" ? "white" : "var(--text-muted)",
+                fontWeight: 700, borderBottom: authTab === "register" ? "2px solid var(--color-indigo)" : "none", cursor: "pointer"
+              }}
+            >
+              Register
+            </button>
+          </div>
+
+          <form onSubmit={handleAuthSubmit} style={{ display: "flex", flexDirection: "column", gap: 15 }}>
+            {authTab === "register" && (
+              <div>
+                <label style={{ fontSize: 11, color: "var(--text-secondary)", display: "block", marginBottom: 5 }}>Full Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Shubham Taywade"
+                  value={authForm.name}
+                  onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })}
+                  className="input-field"
+                />
+              </div>
+            )}
+            <div>
+              <label style={{ fontSize: 11, color: "var(--text-secondary)", display: "block", marginBottom: 5 }}>Email Address</label>
+              <input
+                type="email"
+                required
+                placeholder="user@example.com"
+                value={authForm.email}
+                onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: "var(--text-secondary)", display: "block", marginBottom: 5 }}>Password</label>
+              <input
+                type="password"
+                required
+                placeholder="••••••••"
+                value={authForm.password}
+                onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                className="input-field"
+              />
+            </div>
+
+            <button type="submit" className="btn-primary" style={{ width: "100%", justifyContent: "center", marginTop: 10 }}>
+              {authTab === "login" ? "Sign In" : "Create Account"}
+            </button>
+          </form>
+
+          <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.03)", borderRadius: 6, padding: 12, fontSize: 11, color: "var(--text-muted)", textAlign: "center" }}>
+            <strong>Default Seeded Credentials:</strong><br />
+            Regular User: <code>user@example.com</code> / <code>password123</code><br />
+            Admin User: <code>admin@example.com</code> / <code>password123</code>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg-primary)" }}>
@@ -539,7 +972,7 @@ export default function App() {
           }}>
             <User size={16} />
           </div>
-          <div style={{ overflow: "hidden" }}>
+          <div style={{ overflow: "hidden", flex: 1 }}>
             <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user.name}</div>
             <span className={`badge badge-${user.plan}`} style={{ marginTop: 2 }}>{user.plan}</span>
           </div>
@@ -569,12 +1002,31 @@ export default function App() {
               <span>{link.label}</span>
             </button>
           ))}
+
+          {/* ADMIN LINK (Conditional) */}
+          {user.admin && (
+            <button
+              onClick={() => {
+                setActiveTab("admin");
+                setSelectedProblem(null);
+              }}
+              className={`sidebar-link ${activeTab === "admin" ? "active" : ""}`}
+              style={{ border: "1px solid rgba(245,158,11,0.2)", color: "#fcd34d" }}
+            >
+              <Star size={18} style={{ color: "#fbbf24" }} />
+              <span>Admin Panel</span>
+            </button>
+          )}
         </nav>
 
-        {/* Footer */}
-        <div style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center" }}>
-          PrepEdge Platform v2026.1
-        </div>
+        {/* Logout Button */}
+        <button
+          onClick={handleLogout}
+          className="btn-secondary"
+          style={{ width: "100%", justifyContent: "center", color: "var(--color-rose)" }}
+        >
+          Sign Out
+        </button>
       </aside>
 
       {/* MAIN CONTENT AREA */}
@@ -753,7 +1205,7 @@ export default function App() {
                     key={t}
                     onClick={async () => {
                       setLoading(true);
-                      await fetch(`/api/v1/checklist_items/bulk_create?track=${t}`, { method: "POST" });
+                      await fetchAuth(`/api/v1/checklist_items/bulk_create?track=${t}`, { method: "POST" });
                       await fetchProfile();
                       await fetchChecklist();
                       setLoading(false);
@@ -772,19 +1224,18 @@ export default function App() {
 
             {/* Checklist items by Month */}
             <div style={{ display: "flex", flexDirection: "column", gap: 15 }}>
-              {/* Group items by month */}
               {Object.entries(checklistItems.reduce((acc, item) => {
                 acc[item.month] = acc[item.month] || [];
                 acc[item.month].push(item);
                 return acc;
               }, {})).map(([month, items]) => {
                 const monthTitle = profile.current_track === "SWE" 
-                  ? ["Month 1: Foundation & Assessment", "Month 2: DSA Patterns & Advanced Structures", "Month 3: System Design & LLD", "Month 4: Deep System Design & Concurrency", "Month 5: Integration & Mock Interviews", "Month 6: Company Specifics & Behavioral"][month.to_i - 1]
+                  ? ["Month 1: Foundation & Assessment", "Month 2: DSA Patterns & Advanced Structures", "Month 3: System Design & LLD", "Month 4: Deep System Design & Concurrency", "Month 5: Integration & Mock Interviews", "Month 6: Company Specifics & Behavioral"][month - 1]
                   : profile.current_track === "AI"
-                  ? ["Phase 1: Context Mechanics & Probabilistic Infrastructure", "Phase 2: Standardizing Tool Integration via MCP", "Phase 3: Automated Evals, Observability & Design"][month.to_i - 1]
+                  ? ["Phase 1: Context Mechanics & Probabilistic Infrastructure", "Phase 2: Standardizing Tool Integration via MCP", "Phase 3: Automated Evals, Observability & Design"][month - 1]
                   : `Month ${month} Milestone Track`;
 
-                const monthColor = ["#6366f1", "#8b5cf6", "#0ea5e9", "#14b8a6", "#f59e0b", "#ef4444"][month.to_i - 1] || "#6366f1";
+                const monthColor = ["#6366f1", "#8b5cf6", "#0ea5e9", "#14b8a6", "#f59e0b", "#ef4444"][month - 1] || "#6366f1";
                 const isExpanded = expandedWeeks[month] !== false;
 
                 return (
@@ -934,7 +1385,7 @@ export default function App() {
                   }}>
                     <input
                       type="text"
-                      placeholder={user.plan === "free" ? "Upgrade for unlimited AI Coach messages..." : "Ask your coach about CAP theorem, consistent hashing, SOLID, or MCP..."}
+                      placeholder={user.plan === "free" ? "Upgrade to PRO or TEAM for unlimited AI Coach messages..." : "Ask your coach about CAP theorem, consistent hashing, SOLID, or MCP..."}
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
                       className="input-field"
@@ -972,7 +1423,7 @@ export default function App() {
                   <>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span className="badge badge-pro" style={{ background: "rgba(139,92,246,0.15)", color: "#c084fc" }}>
-                        Active: {activeInterview.interview_type.upcase} Round
+                        Active: {activeInterview.interview_type.toUpperCase()} Round
                       </span>
                       <button
                         onClick={() => setActiveInterview(null)}
@@ -1007,7 +1458,7 @@ export default function App() {
                           className="input-field"
                           style={{ height: 100, resize: "none" }}
                         />
-                        <div style={{ display: "flex", justifyItems: "center", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <span style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 4 }}>
                             <Clock size={12} /> Complete all follow-up turns to trigger rubric grading
                           </span>
@@ -1022,16 +1473,30 @@ export default function App() {
                         <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 6 }}>
                           Rubric feedback and overall score of <strong>{activeInterview.score}%</strong> has been recorded.
                         </p>
-                        <button
-                          onClick={() => {
-                            setActiveInterview(null);
-                            fetchMockInterviews();
-                          }}
-                          className="btn-secondary"
-                          style={{ marginTop: 15 }}
-                        >
-                          Close Simulator
-                        </button>
+                        
+                        {/* SHARE BUTTON */}
+                        <div style={{ marginTop: 15, display: "flex", gap: 10, justifyContent: "center" }}>
+                          <button
+                            onClick={() => {
+                              const shareUrl = `${window.location.origin}/?shared=${activeInterview.share_token}`;
+                              navigator.clipboard.writeText(shareUrl);
+                              showNotification("Public share link copied to clipboard!");
+                            }}
+                            className="btn-primary"
+                            style={{ background: "var(--color-sky)", boxShadow: "none" }}
+                          >
+                            <Share2 size={14} /> Copy Public Share Link
+                          </button>
+                          <button
+                            onClick={() => {
+                              setActiveInterview(null);
+                              fetchMockInterviews();
+                            }}
+                            className="btn-secondary"
+                          >
+                            Close Simulator
+                          </button>
+                        </div>
                       </div>
                     )}
                   </>
@@ -1080,7 +1545,7 @@ export default function App() {
                     }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text-primary)" }}>
-                          {i.interview_type.upcase} Interview
+                          {i.interview_type.toUpperCase()} Interview
                         </span>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                           <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{new Date(i.created_at).toLocaleDateString()}</span>
@@ -1094,9 +1559,23 @@ export default function App() {
                       </div>
                       
                       {i.eval_result && (
-                        <div style={{ display: "flex", gap: 10, background: "rgba(0,0,0,0.2)", padding: 8, borderRadius: 4, fontSize: 11 }}>
-                          <span style={{ color: "var(--text-secondary)" }}>Groundedness: <strong>{i.eval_result.groundedness}</strong></span>
-                          <span style={{ color: "var(--text-secondary)" }}>Context Adherence: <strong>{i.eval_result.relevance}</strong></span>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,0,0,0.2)", padding: "8px 12px", borderRadius: 4, fontSize: 11 }}>
+                          <div style={{ display: "flex", gap: 10 }}>
+                            <span style={{ color: "var(--text-secondary)" }}>Groundedness: <strong>{i.eval_result.groundedness}</strong></span>
+                            <span style={{ color: "var(--text-secondary)" }}>Relevance: <strong>{i.eval_result.relevance}</strong></span>
+                          </div>
+                          
+                          {/* PUBLIC SHARE ACTIONS */}
+                          <button
+                            onClick={() => {
+                              const shareUrl = `${window.location.origin}/?shared=${i.share_token}`;
+                              navigator.clipboard.writeText(shareUrl);
+                              showNotification("Link copied! Anyone can view this report.");
+                            }}
+                            style={{ background: "none", border: "none", color: "var(--color-sky)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontWeight: 700 }}
+                          >
+                            <Share2 size={12} /> Share Report
+                          </button>
                         </div>
                       )}
                     </div>
@@ -1301,7 +1780,7 @@ export default function App() {
                     border: "1px solid rgba(255,255,255,0.02)", padding: "12px 16px", borderRadius: 8, fontSize: 13
                   }}>
                     <div>
-                      <strong style={{ color: "white" }}>{t.type.upcase} Interview</strong>
+                      <strong style={{ color: "white" }}>{t.type.toUpperCase()} Interview</strong>
                       <span style={{ color: "var(--text-muted)", marginLeft: 10 }}>{t.date}</span>
                     </div>
                     <span style={{
@@ -1541,6 +2020,307 @@ export default function App() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ========================================================
+            TAB: ADMIN PANEL
+            ======================================================== */}
+        {activeTab === "admin" && user.admin && (
+          <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: 25 }}>
+            <div>
+              <h2 style={{ fontSize: 28, fontWeight: 800, color: "#fcd34d" }}>Admin Dashboard</h2>
+              <p style={{ color: "var(--text-secondary)" }}>Manage users, maintain coding problems, update RAG corpus, and track system health.</p>
+            </div>
+
+            {/* Admin sub tabs */}
+            <div style={{ display: "flex", gap: 8, borderBottom: "1px solid var(--border-glass)", paddingBottom: 10 }}>
+              {[
+                { id: "metrics", label: "System Metrics" },
+                { id: "users", label: "Manage Users" },
+                { id: "problems", label: "DSA Problems" },
+                { id: "chunks", label: "RAG Context" }
+              ].map(sub => (
+                <button
+                  key={sub.id}
+                  onClick={() => setAdminTab(sub.id)}
+                  style={{
+                    padding: "6px 14px", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                    background: adminTab === sub.id ? "var(--color-indigo)" : "transparent",
+                    color: adminTab === sub.id ? "white" : "var(--text-secondary)",
+                    transition: "all 0.15s"
+                  }}
+                >
+                  {sub.label}
+                </button>
+              ))}
+            </div>
+
+            {/* SUBTAB: SYSTEM METRICS */}
+            {adminTab === "metrics" && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+                <div className="glass-card">
+                  <div style={{ color: "var(--text-muted)", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Total Registered Users</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: "var(--color-indigo)", marginTop: 6 }}>{systemMetrics.total_users}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
+                    {systemMetrics.pro_users} Pro · {systemMetrics.team_users} Team accounts
+                  </div>
+                </div>
+                <div className="glass-card">
+                  <div style={{ color: "var(--text-muted)", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>System Logged Hours</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: "var(--color-emerald)", marginTop: 6 }}>{systemMetrics.total_study_hours} hrs</div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
+                    Aggregated logged time across all user profiles
+                  </div>
+                </div>
+                <div className="glass-card">
+                  <div style={{ color: "var(--text-muted)", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Completed Mock Rounds</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: "var(--color-amber)", marginTop: 6 }}>{systemMetrics.total_interviews}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
+                    Average performance rating: {systemMetrics.average_interview_score}%
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SUBTAB: MANAGE USERS */}
+            {adminTab === "users" && (
+              <div className="glass-card" style={{ padding: 0, overflow: "hidden" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, textAlign: "left" }}>
+                  <thead>
+                    <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid var(--border-glass)", color: "var(--text-secondary)" }}>
+                      <th style={{ padding: "12px 20px" }}>Name / Email</th>
+                      <th style={{ padding: "12px 20px" }}>Admin</th>
+                      <th style={{ padding: "12px 20px" }}>Experience</th>
+                      <th style={{ padding: "12px 20px" }}>Subscription Tier</th>
+                      <th style={{ padding: "12px 20px" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminUsers.map(u => (
+                      <tr key={u.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.02)" }}>
+                        <td style={{ padding: "12px 20px" }}>
+                          <div style={{ fontWeight: 700 }}>{u.name}</div>
+                          <div style={{ color: "var(--text-secondary)", fontSize: 11 }}>{u.email}</div>
+                        </td>
+                        <td style={{ padding: "12px 20px" }}>
+                          <span style={{ color: u.admin ? "var(--color-amber)" : "var(--text-muted)" }}>
+                            {u.admin ? "Yes" : "No"}
+                          </span>
+                        </td>
+                        <td style={{ padding: "12px 20px" }}>{u.profile?.years_experience || 0} yrs</td>
+                        <td style={{ padding: "12px 20px" }}>
+                          <select
+                            value={u.plan}
+                            onChange={(e) => updateAdminUserPlan(u.id, e.target.value)}
+                            className="input-field"
+                            style={{ width: 100, padding: 4 }}
+                          >
+                            <option value="free">free</option>
+                            <option value="pro">pro</option>
+                            <option value="team">team</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: "12px 20px" }}>
+                          <button
+                            onClick={() => deleteAdminUser(u.id)}
+                            style={{ background: "none", border: "none", color: "var(--color-rose)", cursor: "pointer" }}
+                            title="Delete User Account"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* SUBTAB: DSA PROBLEMS */}
+            {adminTab === "problems" && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 25 }}>
+                {/* Form */}
+                <div className="glass-card">
+                  <h3 style={{ fontSize: 18, marginBottom: 15 }}>Create Practice Question</h3>
+                  <form onSubmit={createAdminProblem} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>Title</label>
+                        <input
+                          type="text" required placeholder="e.g. LFU Cache"
+                          value={adminProblemForm.title}
+                          onChange={(e) => setAdminProblemForm({ ...adminProblemForm, title: e.target.value, slug: e.target.value.toLowerCase().replace(/ /g, "-") })}
+                          className="input-field"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>Slug</label>
+                        <input
+                          type="text" required placeholder="lfu-cache"
+                          value={adminProblemForm.slug}
+                          onChange={(e) => setAdminProblemForm({ ...adminProblemForm, slug: e.target.value })}
+                          className="input-field"
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>Difficulty</label>
+                        <select
+                          value={adminProblemForm.difficulty}
+                          onChange={(e) => setAdminProblemForm({ ...adminProblemForm, difficulty: e.target.value })}
+                          className="input-field"
+                        >
+                          <option value="Easy">Easy</option>
+                          <option value="Medium">Medium</option>
+                          <option value="Hard">Hard</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>Topic</label>
+                        <input
+                          type="text" required placeholder="e.g. Heaps"
+                          value={adminProblemForm.topic}
+                          onChange={(e) => setAdminProblemForm({ ...adminProblemForm, topic: e.target.value })}
+                          className="input-field"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>Problem Description</label>
+                      <textarea
+                        required placeholder="Write detailed instructions..."
+                        value={adminProblemForm.description}
+                        onChange={(e) => setAdminProblemForm({ ...adminProblemForm, description: e.target.value })}
+                        className="input-field"
+                        style={{ height: 80, resize: "none" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>Starter Code Template</label>
+                      <textarea
+                        required placeholder="def solution(args)\n  \nend"
+                        value={adminProblemForm.starter_code}
+                        onChange={(e) => setAdminProblemForm({ ...adminProblemForm, starter_code: e.target.value })}
+                        className="input-field"
+                        style={{ height: 80, fontFamily: "var(--font-mono)", fontSize: 12 }}
+                      />
+                    </div>
+
+                    <button type="submit" className="btn-primary" style={{ justifyContent: "center", marginTop: 5 }}>
+                      <Plus size={16} /> Add Problem to Database
+                    </button>
+                  </form>
+                </div>
+
+                {/* List */}
+                <div className="glass-card" style={{ overflowY: "auto", maxHeight: 480 }}>
+                  <h3 style={{ fontSize: 18, marginBottom: 15 }}>Seeded DSA Challenges</h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {adminProblems.map(p => (
+                      <div key={p.id} style={{
+                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                        background: "rgba(255,255,255,0.01)", border: "1px solid var(--border-glass)",
+                        padding: "10px 14px", borderRadius: 8, fontSize: 13
+                      }}>
+                        <div>
+                          <div style={{ fontWeight: 700 }}>{p.title}</div>
+                          <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{p.topic} · {p.difficulty}</span>
+                        </div>
+                        <button
+                          onClick={() => deleteAdminProblem(p.id)}
+                          style={{ background: "none", border: "none", color: "var(--color-rose)", cursor: "pointer" }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SUBTAB: RAG CONTEXT */}
+            {adminTab === "chunks" && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 25 }}>
+                {/* Form */}
+                <div className="glass-card">
+                  <h3 style={{ fontSize: 18, marginBottom: 15 }}>Create RAG Knowledge Document</h3>
+                  <form onSubmit={createAdminChunk} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>Category</label>
+                      <select
+                        value={adminChunkForm.source_type}
+                        onChange={(e) => setAdminChunkForm({ ...adminChunkForm, source_type: e.target.value })}
+                        className="input-field"
+                      >
+                        <option value="system_design">System Design</option>
+                        <option value="lld">Low-Level Design</option>
+                        <option value="dsa">DSA Guide</option>
+                        <option value="ai">AI / LLMOps Architecture</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>Title</label>
+                      <input
+                        type="text" required placeholder="e.g. Kafka Partition Scaling"
+                        value={adminChunkForm.title}
+                        onChange={(e) => setAdminChunkForm({ ...adminChunkForm, title: e.target.value })}
+                        className="input-field"
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>Document Text Content</label>
+                      <textarea
+                        required placeholder="Write detailed educational reference text..."
+                        value={adminChunkForm.content}
+                        onChange={(e) => setAdminChunkForm({ ...adminChunkForm, content: e.target.value })}
+                        className="input-field"
+                        style={{ height: 160, resize: "vertical" }}
+                      />
+                    </div>
+
+                    <button type="submit" className="btn-primary" style={{ justifyContent: "center" }}>
+                      <Plus size={16} /> Save to Knowledge Corpus
+                    </button>
+                  </form>
+                </div>
+
+                {/* List */}
+                <div className="glass-card" style={{ overflowY: "auto", maxHeight: 480 }}>
+                  <h3 style={{ fontSize: 18, marginBottom: 15 }}>Knowledge Corpus Chunks</h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {adminChunks.map(c => (
+                      <div key={c.id} style={{
+                        display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+                        background: "rgba(255,255,255,0.01)", border: "1px solid var(--border-glass)",
+                        padding: "12px 14px", borderRadius: 8, fontSize: 13
+                      }}>
+                        <div style={{ flex: 1, paddingRight: 10 }}>
+                          <div style={{ fontWeight: 700 }}>{c.title}</div>
+                          <div style={{ fontSize: 10, color: "var(--color-indigo)", textTransform: "uppercase", marginTop: 2 }}>{c.source_type}</div>
+                          <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                            {c.content}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => deleteAdminChunk(c.id)}
+                          style={{ background: "none", border: "none", color: "var(--color-rose)", cursor: "pointer", flexShrink: 0 }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
