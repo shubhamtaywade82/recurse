@@ -1,4 +1,4 @@
-class Api::V1::StudyLogsController < ApplicationController
+class Api::V1::StudyLogsController < Api::V1::BaseController
   def index
     logs = current_user.study_logs.order(date: :desc)
     render json: { study_logs: logs }

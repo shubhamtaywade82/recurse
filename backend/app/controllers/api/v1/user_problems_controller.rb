@@ -1,4 +1,4 @@
-class Api::V1::UserProblemsController < ApplicationController
+class Api::V1::UserProblemsController < Api::V1::BaseController
   def create
     problem = Problem.find(params[:problem_id])
     up = current_user.user_problems.find_or_initialize_by(problem_id: problem.id)

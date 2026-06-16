@@ -9,13 +9,8 @@ class Api::V1::AuthController < ApplicationController
 
     if user.authenticate(params[:password])
       render json: {
-        token: user.email,
-        user: {
-          email: user.email,
-          name: user.name,
-          plan: user.plan,
-          admin: user.admin
-        }
+        token: JwtService.encode(user.id),
+        user: user_json(user)
       }
     else
       render json: { error: "Incorrect password. Please try again." }, status: :unauthorized
@@ -33,16 +28,22 @@ class Api::V1::AuthController < ApplicationController
 
     if user.save
       render json: {
-        token: user.email,
-        user: {
-          email: user.email,
-          name: user.name,
-          plan: user.plan,
-          admin: user.admin
-        }
+        token: JwtService.encode(user.id),
+        user: user_json(user)
       }
     else
       render json: { error: user.errors.full_messages.join(", ") }, status: :unprocessable_entity
     end
+  end
+
+  private
+
+  def user_json(user)
+    {
+      email: user.email,
+      name: user.name,
+      plan: user.plan,
+      admin: user.admin
+    }
   end
 end

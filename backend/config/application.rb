@@ -11,6 +11,13 @@ module Backend
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.1
 
+    config.middleware.use Rack::Attack
+
+  # Allow mock self-service plan changes in development/self-host when explicitly enabled.
+  config.allow_mock_billing = ActiveModel::Type::Boolean.new.cast(
+    ENV.fetch("ALLOW_MOCK_BILLING", Rails.env.development? || Rails.env.test?)
+  )
+
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.

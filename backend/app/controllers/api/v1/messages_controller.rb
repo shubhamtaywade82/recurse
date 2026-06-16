@@ -1,5 +1,7 @@
-class Api::V1::MessagesController < ApplicationController
+class Api::V1::MessagesController < Api::V1::BaseController
   def create
+    UsageLimiter.new(current_user).deny!(:coach_messages)
+
     session = current_user.coach_sessions.find(params[:coach_session_id])
     content = params[:content]
 
@@ -8,7 +10,6 @@ class Api::V1::MessagesController < ApplicationController
       return
     end
 
-    # Call AI RAG Coach Service
     service = Ai::StudyCoachService.new(current_user, session, content)
     ai_message = service.call
 

@@ -1,4 +1,4 @@
-class Api::V1::ChecklistItemsController < ApplicationController
+class Api::V1::ChecklistItemsController < Api::V1::BaseController
   def index
     track = current_user.profile&.current_track || "SWE"
     items = current_user.checklist_items.where(track: track).order(month: :asc, id: :asc)

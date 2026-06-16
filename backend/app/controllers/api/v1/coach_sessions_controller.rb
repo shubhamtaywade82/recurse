@@ -1,4 +1,4 @@
-class Api::V1::CoachSessionsController < ApplicationController
+class Api::V1::CoachSessionsController < Api::V1::BaseController
   def index
     sessions = current_user.coach_sessions.order(created_at: :desc)
     render json: { coach_sessions: sessions }

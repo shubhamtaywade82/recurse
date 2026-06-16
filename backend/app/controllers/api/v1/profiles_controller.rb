@@ -1,4 +1,4 @@
-class Api::V1::ProfilesController < ApplicationController
+class Api::V1::ProfilesController < Api::V1::BaseController
   def show
     profile = current_user.profile || current_user.create_profile!
     render json: {

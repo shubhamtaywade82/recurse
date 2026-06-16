@@ -4,9 +4,9 @@ class ApplicationController < ActionController::API
   end
 
   def authenticate_user!
-    if current_user.nil?
-      render json: { error: "Unauthorized access" }, status: :unauthorized
-    end
+    return if current_user.present?
+
+    render json: { error: "Unauthorized access" }, status: :unauthorized
   end
 
   def authenticate_admin!
@@ -25,7 +25,9 @@ class ApplicationController < ActionController::API
     return nil if auth_header.blank?
 
     token = auth_header.split(" ").last
-    # Supports simple token authentication based on email
-    User.find_by(email: token)
+    payload = JwtService.decode(token)
+    return nil if payload.blank?
+
+    User.find_by(id: payload["user_id"])
   end
 end

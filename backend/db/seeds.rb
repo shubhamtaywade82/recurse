@@ -1,36 +1,38 @@
-# Clear existing users to prevent password validation mismatches
+# frozen_string_literal: true
+
+admin_email = ENV.fetch("SEED_ADMIN_EMAIL", "admin@example.com")
+admin_password = ENV.fetch("SEED_ADMIN_PASSWORD", "password123")
+user_email = ENV.fetch("SEED_USER_EMAIL", "user@example.com")
+user_password = ENV.fetch("SEED_USER_PASSWORD", "password123")
+
 User.destroy_all
 Problem.destroy_all
 ContentChunk.destroy_all
 
-# Seed an Admin user
 admin = User.create!(
-  email: "admin@example.com",
+  email: admin_email,
   name: "System Admin",
-  password: "password123",
+  password: admin_password,
   plan: "team",
   admin: true
 )
 
-# Seed a default regular user
 user = User.create!(
-  email: "user@example.com",
+  email: user_email,
   name: "Senior Candidate",
-  password: "password123",
+  password: user_password,
   plan: "free",
   admin: false
 )
 
-# Seed an additional test user
 User.create!(
   email: "test@example.com",
   name: "Test User",
-  password: "password123",
+  password: user_password,
   plan: "free",
   admin: false
 )
 
-# Seed Problems
 problems_data = [
   {
     slug: "two-sum",
@@ -106,7 +108,6 @@ problems_data.each do |p_data|
   end
 end
 
-# Seed Content Chunks (RAG database)
 content_chunks_data = [
   {
     source_type: "system_design",
@@ -148,4 +149,6 @@ content_chunks_data.each do |c_data|
   end
 end
 
-puts "Database seeded successfully with user: user@example.com / password123 and admin: admin@example.com / password123"
+puts "Database seeded successfully."
+puts "Admin: #{admin.email} (set SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD to customize)"
+puts "User:  #{user.email} (set SEED_USER_EMAIL / SEED_USER_PASSWORD to customize)"

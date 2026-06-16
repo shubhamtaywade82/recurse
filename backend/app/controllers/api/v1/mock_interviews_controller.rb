@@ -1,4 +1,4 @@
-class Api::V1::MockInterviewsController < ApplicationController
+class Api::V1::MockInterviewsController < Api::V1::BaseController
   QUESTIONS = {
     "dsa" => {
       q1: "Hello! Welcome to your DSA round. Today, I'd like you to design a sliding window maximum algorithm. You are given an array of integers `nums` and a window size `k`. We want to return the maximum element in each window. Can you explain your approach and how we can achieve O(N) time complexity?",
@@ -37,6 +37,8 @@ class Api::V1::MockInterviewsController < ApplicationController
   end
 
   def create
+    UsageLimiter.new(current_user).deny!(:mock_interviews)
+
     type = params[:interview_type] || "dsa"
     unless %w[dsa system_design behavioral].include?(type)
       render json: { error: "Invalid interview type" }, status: :unprocessable_entity

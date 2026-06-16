@@ -1,5 +1,4 @@
-class Api::V1::Admin::UsersController < ApplicationController
-  before_action :authenticate_admin!
+class Api::V1::Admin::UsersController < Api::V1::Admin::BaseController
 
   def index
     users = User.all.includes(:profile).map do |u|
@@ -18,7 +17,11 @@ class Api::V1::Admin::UsersController < ApplicationController
 
   def update
     user = User.find(params[:id])
-    if user.update(user_params)
+    attrs = {}
+    attrs[:plan] = params.dig(:user, :plan) if params.dig(:user, :plan).present?
+    attrs[:admin] = ActiveModel::Type::Boolean.new.cast(params.dig(:user, :admin)) unless params.dig(:user, :admin).nil?
+
+    if user.update(attrs)
       render json: { user: user }
     else
       render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
@@ -51,11 +54,5 @@ class Api::V1::Admin::UsersController < ApplicationController
       total_interviews: total_interviews,
       average_interview_score: avg_score
     }
-  end
-
-  private
-
-  def user_params
-    params.require(:user).permit(:plan, :admin)
   end
 end

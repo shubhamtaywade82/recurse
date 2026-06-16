@@ -10,7 +10,6 @@ import {
   Settings,
   Play,
   Send,
-  Lock,
   Clock,
   ChevronDown,
   ChevronUp,
@@ -25,6 +24,10 @@ import {
   Plus,
   Star
 } from "lucide-react";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+
+const apiUrl = (path) => `${API_BASE}${path}`;
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
@@ -140,11 +143,15 @@ export default function App() {
       "Authorization": `Bearer ${token}`,
       "Content-Type": "application/json"
     };
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(apiUrl(url), { ...options, headers });
     if (res.status === 401) {
-      // Clear expired auth session
       handleLogout();
       throw new Error("Session expired. Please log in again.");
+    }
+    if (res.status === 402) {
+      const data = await res.json();
+      showNotification(data.error || "Plan limit reached", "error");
+      throw new Error(data.error || "Plan limit reached");
     }
     return res;
   };
@@ -158,7 +165,7 @@ export default function App() {
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const endpoint = authTab === "login" ? "/api/v1/auth/login" : "/api/v1/auth/register";
+    const endpoint = apiUrl(authTab === "login" ? "/api/v1/auth/login" : "/api/v1/auth/register");
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -176,7 +183,7 @@ export default function App() {
       } else {
         showNotification(data.error || "Authentication failed", "error");
       }
-    } catch (err) {
+    } catch {
       showNotification("Network error occurred", "error");
     } finally {
       setLoading(false);
@@ -194,7 +201,7 @@ export default function App() {
   // Shared interview retrieval
   const fetchSharedInterview = async (shareToken) => {
     try {
-      const res = await fetch(`/api/v1/shared/mock_interviews/${shareToken}`);
+      const res = await fetch(apiUrl(`/api/v1/shared/mock_interviews/${shareToken}`));
       const data = await res.json();
       if (data.mock_interview) {
         setSharedData(data);
@@ -307,7 +314,7 @@ export default function App() {
         localStorage.setItem("user", JSON.stringify(data.user));
         showNotification(`Simulated payment approved! Upgraded to ${plan} tier.`);
       }
-    } catch (e) {
+    } catch {
       showNotification("Payment failed", "error");
     } finally {
       setLoading(false);
@@ -336,7 +343,7 @@ export default function App() {
         fetchGapAnalytics();
         setLogForm({ dsa: 0, sd: 0, lld: 0, ai: 0 });
       }
-    } catch (e) {
+    } catch {
       showNotification("Failed to log study hours", "error");
     } finally {
       setLoading(false);
@@ -1099,7 +1106,7 @@ export default function App() {
               {/* Daily Logger */}
               <div className="glass-card">
                 <h3 style={{ fontSize: 18, marginBottom: 15, display: "flex", alignItems: "center", gap: 8 }}>
-                  <Clock size={18} style={{ color: "var(--color-indigo)" }} /> Log Today's Study Hours
+                  <Clock size={18} style={{ color: "var(--color-indigo)" }} /> Log Today&apos;s Study Hours
                 </h3>
                 <form onSubmit={logStudyTime} style={{ display: "flex", flexDirection: "column", gap: 15 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 15 }}>
@@ -1690,7 +1697,7 @@ export default function App() {
                   <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: 15 }}>
                     <h3 style={{ fontSize: 18, color: "var(--color-amber)" }}>Socratic Helper</h3>
                     <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-                      Don't spoil the answer! Click below to request gradual nudges.
+                      Don&apos;t spoil the answer! Click below to request gradual nudges.
                     </p>
 
                     {[

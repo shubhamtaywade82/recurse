@@ -1,4 +1,4 @@
-class Api::V1::PracticePlansController < ApplicationController
+class Api::V1::PracticePlansController < Api::V1::BaseController
   def show
     # Retrieve user's profile and construct a default or previously generated plan
     profile = current_user.profile || current_user.create_profile!

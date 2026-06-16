@@ -1,4 +1,4 @@
-class Api::V1::ProblemsController < ApplicationController
+class Api::V1::ProblemsController < Api::V1::BaseController
   def index
     problems = Problem.all.map do |p|
       up = current_user.user_problems.find_by(problem_id: p.id)

@@ -1,5 +1,4 @@
-class Api::V1::Admin::ContentChunksController < ApplicationController
-  before_action :authenticate_admin!
+class Api::V1::Admin::ContentChunksController < Api::V1::Admin::BaseController
 
   def index
     chunks = ContentChunk.all.order(created_at: :desc)

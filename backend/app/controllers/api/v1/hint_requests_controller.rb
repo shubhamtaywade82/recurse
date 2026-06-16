@@ -1,5 +1,7 @@
-class Api::V1::HintRequestsController < ApplicationController
+class Api::V1::HintRequestsController < Api::V1::BaseController
   def create
+    UsageLimiter.new(current_user).deny!(:hints)
+
     problem = Problem.find(params[:problem_id])
     up = current_user.user_problems.find_or_create_by!(problem_id: problem.id) do |record|
       record.status = "attempted"

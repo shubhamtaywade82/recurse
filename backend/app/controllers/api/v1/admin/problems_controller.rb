@@ -1,5 +1,4 @@
-class Api::V1::Admin::ProblemsController < ApplicationController
-  before_action :authenticate_admin!
+class Api::V1::Admin::ProblemsController < Api::V1::Admin::BaseController
 
   def index
     problems = Problem.all.order(created_at: :desc)

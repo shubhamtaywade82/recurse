@@ -1,4 +1,4 @@
-class Api::V1::GapAnalyticsController < ApplicationController
+class Api::V1::GapAnalyticsController < Api::V1::BaseController
   def show
     # Generate competency ratings based on solved problems
     solved_problems = current_user.user_problems.where(status: "solved").includes(:problem)

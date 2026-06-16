@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: prepedge
+      POSTGRES_PASSWORD: prepedge
+      POSTGRES_DB: prepedge_development
+    volumes:
+      - prepedge_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prepedge -d prepedge_development"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.compose
+    ports:
+      - "3005:3005"
+    environment:
+      RAILS_ENV: development
+      DATABASE_URL: postgres://prepedge:prepedge@db:5432/prepedge_development
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      FRONTEND_ORIGIN: http://localhost:8080
+      ALLOW_MOCK_BILLING: "true"
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@example.com}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-password123}
+      SEED_USER_EMAIL: ${SEED_USER_EMAIL:-user@example.com}
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-password123}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ""
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles:
+      - ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - prepedge_ollama_data:/root/.ollama
+
+volumes:
+  prepedge_pg_data:
+  prepedge_ollama_data:
